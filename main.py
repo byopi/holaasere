@@ -65,11 +65,20 @@ async def get_latest_tweet_id(username: str):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
+    print(
+        f"[{datetime.now()}] Consultando Syndication API para @{username}...",
+        flush=True,
+    )
+
     try:
         async with httpx.AsyncClient(
-            follow_redirects=True, timeout=10.0
+            follow_redirects=True, timeout=15.0
         ) as client:
             response = await client.get(url, headers=headers)
+            print(
+                f"[{datetime.now()}] Respuesta de @{username}: Código {response.status_code}",
+                flush=True,
+            )
 
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")
@@ -81,12 +90,30 @@ async def get_latest_tweet_id(username: str):
                     first_link = tweet_links[0]["href"]
                     tweet_id = first_link.split("/status/")[1].split("?")[0]
                     tweet_url = f"https://x.com/{username}/status/{tweet_id}"
+                    print(
+                        f"[{datetime.now()}] Tweet encontrado para @{username}: {tweet_id}",
+                        flush=True,
+                    )
                     return tweet_id, tweet_url
+                else:
+                    print(
+                        f"[{datetime.now()}] No se encontraron enlaces de tweets en el HTML de @{username}",
+                        flush=True,
+                    )
+            else:
+                await send_log(
+                    f"Syndication API devolvió estado {response.status_code} para @{username}"
+                )
     except Exception as e:
-        await send_log(f"Error al consultar Syndication API para @{username}: {e}")
+        print(
+            f"[{datetime.now()}] Error HTTP consultando @{username}: {e}",
+            flush=True,
+        )
+        await send_log(
+            f"Error al consultar Syndication API para @{username}: {e}"
+        )
 
     return None, None
-
 
 # --- DESCARGAR Y ENVIAR MULTIMEDIA A TELEGRAM ---
 async def process_and_send_tweet(username: str, tweet_url: str):
@@ -172,23 +199,40 @@ async def monitor_loop():
 
     while True:
         for account in TARGET_ACCOUNTS:
+            print(
+                f"[{datetime.now()}] --- Iniciando revisión de @{account} ---",
+                flush=True,
+            )
             tweet_id, tweet_url = await get_latest_tweet_id(account)
 
             if tweet_id:
                 if last_tweet_ids[account] is None:
                     last_tweet_ids[account] = tweet_id
                     print(
-                        f"[{datetime.now()}] @{account} registrado. Enviando prueba...",
+                        f"[{datetime.now()}] @{account} registrado. Enviando prueba de arranque...",
                         flush=True,
                     )
                     await process_and_send_tweet(account, tweet_url)
 
                 elif tweet_id != last_tweet_ids[account]:
                     last_tweet_ids[account] = tweet_id
+                    print(
+                        f"[{datetime.now()}] ¡NUEVO TWEET DETECTADO de @{account}! Procesando...",
+                        flush=True,
+                    )
                     await process_and_send_tweet(account, tweet_url)
+            else:
+                print(
+                    f"[{datetime.now()}] No se pudo obtener tweet para @{account}",
+                    flush=True,
+                )
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
 
+        print(
+            f"[{datetime.now()}] Ciclo completado. Esperando {CHECK_INTERVAL} segundos...",
+            flush=True,
+        )
         await asyncio.sleep(CHECK_INTERVAL)
 
 
