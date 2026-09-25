@@ -18,7 +18,7 @@ TELEGRAM_LOG_CHANNEL_ID = os.getenv(
     "TELEGRAM_LOG_CHANNEL_ID"
 )  # ID de tu canal privado de logs
 
-TARGET_ACCOUNTS = ["PolymarketFC", "ActuFoot_"]
+TARGET_ACCOUNTS = ["PolymarketFC", "ActuFoot_", "TouchlineX"]
 CHECK_INTERVAL = 90  # Segundos entre revisiones
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
