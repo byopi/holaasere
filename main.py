@@ -90,7 +90,6 @@ async def get_latest_tweet_id(username: str):
 
 # --- DESCARGAR Y ENVIAR MULTIMEDIA A TELEGRAM ---
 async def process_and_send_tweet(username: str, tweet_url: str):
-    # Opciones de configuración para yt-dlp
     ydl_opts = {
         "outtmpl": "downloaded_media.%(ext)s",
         "format": "bestvideo+bestaudio/best",
@@ -100,25 +99,22 @@ async def process_and_send_tweet(username: str, tweet_url: str):
 
     file_path = None
     try:
-        # Extraer información del tweet y descargar la media
+        # Intenta descargar la foto/video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(tweet_url, download=True)
             text_caption = info.get("description") or info.get("title") or ""
             filename = ydl.prepare_filename(info)
             file_path = filename
 
-        # Formatear el texto inicial para el borrador
         caption_formatted = (
             f"📌 <b>De: @{username}</b>\n\n"
             f"{text_caption}\n\n"
             f"🔗 <a href='{tweet_url}'>Ver en X</a>"
         )
 
-        # Cortar caption si supera el límite de Telegram (1024 chars para media)
         if len(caption_formatted) > 1024:
             caption_formatted = caption_formatted[:1020] + "..."
 
-        # Determinar si es Foto o Video y enviar a Telegram
         if file_path and os.path.exists(file_path):
             ext = os.path.splitext(file_path)[1].lower()
 
@@ -138,7 +134,6 @@ async def process_and_send_tweet(username: str, tweet_url: str):
                         parse_mode="HTML",
                     )
                 else:
-                    # Si es otro formato no reconocido, enviar como documento
                     await bot.send_document(
                         chat_id=TELEGRAM_CHAT_ID,
                         document=media_file,
@@ -146,12 +141,15 @@ async def process_and_send_tweet(username: str, tweet_url: str):
                         parse_mode="HTML",
                     )
 
-            print(f"[{datetime.now()}] Media de @{username} enviada a Telegram.")
+            print(
+                f"[{datetime.now()}] Media de @{username} enviada a Telegram.",
+                flush=True,
+            )
 
     except Exception as e:
-        # Si falla la descarga multimedia (ej: tweet solo texto), enviar mensaje simple
+        # AQUÍ VA EL BLOQUE EXCEPT
         await send_log(
-            f"No se pudo extraer media de {tweet_url}. Enviando enlace simple. Error: {e}"
+            f"Fallo descarga de {tweet_url}. Enviando enlace. Error: {e}"
         )
         await bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
@@ -160,7 +158,7 @@ async def process_and_send_tweet(username: str, tweet_url: str):
         )
 
     finally:
-        # Borrar el archivo local del servidor de Render para no llenar el disco
+        # Limpieza de archivo temporal
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
@@ -180,8 +178,10 @@ async def monitor_loop():
                 if last_tweet_ids[account] is None:
                     last_tweet_ids[account] = tweet_id
                     print(
-                        f"[{datetime.now()}] @{account} registrado. Último ID: {tweet_id}"
+                        f"[{datetime.now()}] @{account} registrado. Enviando prueba...",
+                        flush=True,
                     )
+                    await process_and_send_tweet(account, tweet_url)
 
                 elif tweet_id != last_tweet_ids[account]:
                     last_tweet_ids[account] = tweet_id
